@@ -15,7 +15,8 @@
             android:layout_height="?attr/actionBarSize"
             android:background="@color/primary"
             android:title="@string/app_name"
-            android:titleTextColor="#FFFFFF" />
+            android:titleTextColor="#FFFFFF"
+            app:navigationIcon="?attr/homeAsUpIndicator" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView

@@ -10,4 +10,11 @@
     <color name="error">#D32F2F</color>
     <color name="discount">#4CAF50</color>
     <color name="loyalty_row">#E8F5E9</color>
+
+    <color name="card_blue">#1565C0</color>
+    <color name="card_green">#2E7D32</color>
+    <color name="card_orange">#E65100</color>
+    <color name="card_purple">#6A1B9A</color>
+    <color name="card_red">#C62828</color>
+    <color name="stock_yellow">#F57F17</color>
 </resources>

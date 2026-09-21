@@ -14,4 +14,38 @@
     <string name="btn_remove">Quitar</string>
     <string name="scan_hint">Apunta al código de barras…</string>
     <string name="btn_close">Cerrar</string>
+
+    <!-- Home menu -->
+    <string name="home_title">Inventory Management</string>
+    <string name="home_subtitle">Tienda 3 — Terex3</string>
+    <string name="menu_nota_title">Nota / Ventas</string>
+    <string name="menu_nota_sub">Registrar ventas, escanear productos y generar ticket PDF</string>
+    <string name="menu_entrada_title">Entrada de Mercancía</string>
+    <string name="menu_entrada_sub">Registrar entrada de nuevos productos al inventario</string>
+    <string name="menu_conteo_efectivo_title">Conteo de Efectivo</string>
+    <string name="menu_conteo_efectivo_sub">Ver saldo, registrar ingresos, gastos y conteos de caja</string>
+    <string name="menu_transferencias_title">Transferencias</string>
+    <string name="menu_transferencias_sub">Ver y gestionar transferencias de mercancía</string>
+    <string name="menu_inventario_codigo_title">Verificación Inventario por Código</string>
+    <string name="menu_inventario_codigo_sub">Verificar el inventario utilizando códigos de barras</string>
+    <string name="menu_check_barcode_title">Check Barcode Mobile</string>
+    <string name="menu_check_barcode_sub">Escanear, contar y fotear desde el celular — Terex 3</string>
+    <string name="menu_conteo_previo_title">Conteo Previo Mercancía</string>
+    <string name="menu_conteo_previo_sub">Contar cajas antes de entrada, recibo WhatsApp, verificación</string>
+    <string name="menu_inventario_modelo_title">Inventario Rápido por Modelo</string>
+    <string name="menu_inventario_modelo_sub">Busca un modelo y ve el stock por estilo en Terex 3</string>
+    <string name="menu_conteo_estilo_title">Conteo Rápido por Estilo</string>
+    <string name="menu_conteo_estilo_sub">Selecciona modelo, cuenta cada estilo uno por uno</string>
+    <string name="menu_coming_soon">Próximamente en la app — usa la versión web por ahora</string>
+
+    <!-- Inventario x Código -->
+    <string name="inv_check_title">Inventario x Código</string>
+    <string name="inv_check_subtitle">inventario1 · terex3 · terex3_history</string>
+    <string name="hint_qty_counted">Cantidad Contada</string>
+    <string name="btn_checar">⚡ CHECAR</string>
+    <string name="label_system_stock">Sistema terex3</string>
+    <string name="label_counted">Contado</string>
+    <string name="label_diff">Diferencia</string>
+    <string name="label_history">Historial terex3 · barcode</string>
+    <string name="label_session">Verificados esta sesión</string>
 </resources>

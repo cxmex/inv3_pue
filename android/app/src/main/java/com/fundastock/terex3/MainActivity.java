@@ -82,6 +82,7 @@ public class MainActivity extends AppCompatActivity implements CartAdapter.Liste
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        toolbar.setNavigationOnClickListener(v -> finish());
 
         etBarcode = findViewById(R.id.etBarcode);
         tvStatus = findViewById(R.id.tvStatus);
