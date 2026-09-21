@@ -146,6 +146,7 @@ public class SlideshowActivity extends Activity {
                         .put("column", "name")
                         .put("order", "asc");
                 JSONObject body = new JSONObject()
+                        .put("prefix", "")
                         .put("limit", 1000)
                         .put("offset", 0)
                         .put("sortBy", sortBy);
