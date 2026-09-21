@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nota Terex3</string>
+    <string name="label_total_pieces">Total Piezas:</string>
+    <string name="hint_barcode">Escanea o ingresa código…</string>
+    <string name="btn_buscar">Buscar</string>
+    <string name="btn_scan">📷</string>
+    <string name="label_subtotal">SUBTOTAL</string>
+    <string name="label_discount">DESCUENTO</string>
+    <string name="label_total">TOTAL</string>
+    <string name="payment_cash">💵 Efectivo</string>
+    <string name="payment_transfer">💳 Transferencia</string>
+    <string name="btn_guardar_venta">Guardar Venta</string>
+    <string name="btn_remove">Quitar</string>
+    <string name="scan_hint">Apunta al código de barras…</string>
+    <string name="btn_close">Cerrar</string>
+</resources>
