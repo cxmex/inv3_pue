@@ -321,7 +321,7 @@ public class ConteoEstiloActivity extends AppCompatActivity {
             btnOk.setTextColor(0xFFFFFFFF);
             LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            btnLp.marginStart = dp(6);
+            btnLp.setMarginStart(dp(6));
             btnOk.setLayoutParams(btnLp);
 
             btnOk.setOnClickListener(v -> saveOne(ec.estiloId, etQty, btnOk, row, allInputs));
