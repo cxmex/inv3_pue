@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Transferir Mercancia</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { background: #f5f5f5; font-size: 15px; }
+        .header { background: #6a1b9a; color: #fff; padding: .8rem; text-align: center; position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 1.3rem; margin: 0; }
+        .header small { opacity: .8; }
+        .container { max-width: 600px; padding: .5rem; }
+
+        .scan-section { background: #fff; border-radius: 10px; padding: 1rem; margin-bottom: .8rem; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+        .scan-input { font-size: 1.4rem; text-align: center; font-weight: 600; letter-spacing: 1px; }
+        .scan-status { font-size: .85rem; color: #888; text-align: center; margin-top: .3rem; }
+
+        .products-section { background: #fff; border-radius: 10px; padding: .5rem; margin-bottom: .8rem; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+        .product-row { display: flex; align-items: center; padding: .5rem 0; border-bottom: 1px solid #eee; font-size: .9rem; }
+        .product-row:last-child { border-bottom: none; }
+        .prod-qty { width: 35px; text-align: center; font-weight: 700; font-size: 1.1rem; color: #6a1b9a; }
+        .prod-info { flex: 1; padding: 0 .4rem; }
+        .prod-info .prod-name { font-weight: 600; }
+        .prod-info .prod-code { font-size: .75rem; color: #888; }
+        .prod-info .prod-stock { font-size: .75rem; color: #6a1b9a; }
+        .prod-remove { color: #d32f2f; cursor: pointer; padding: 0 .3rem; font-size: 1.2rem; }
+
+        .summary-section { background: #f3e5f5; border-radius: 10px; padding: .8rem; margin-bottom: .8rem; }
+        .summary-row { display: flex; justify-content: space-between; padding: .2rem 0; }
+        .summary-row.main { font-size: 1.3rem; font-weight: 700; color: #6a1b9a; }
+
+        .btn-transfer {
+            width: 100%; padding: 1rem; font-size: 1.3rem; font-weight: 700;
+            background: #6a1b9a; border: none; color: #fff; border-radius: 12px;
+            margin-bottom: .5rem;
+        }
+        .btn-transfer:disabled { background: #aaa; }
+        .btn-transfer:hover:not(:disabled) { background: #4a148c; color: #fff; }
+
+        .success-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,.7); z-index: 9999; justify-content: center; align-items: center;
+        }
+        .success-card {
+            background: #fff; border-radius: 16px; padding: 2rem; max-width: 400px; width: 90%;
+            text-align: center;
+        }
+        .success-card .check { font-size: 3rem; color: #6a1b9a; }
+        .empty-msg { text-align: center; color: #aaa; padding: 2rem 0; }
+
+        .btn-camera {
+            width: 100%; padding: .8rem; font-size: 1.1rem; font-weight: 600;
+            background: #1565c0; border: none; color: #fff; border-radius: 10px;
+            margin-top: .5rem; cursor: pointer;
+        }
+        .btn-camera:hover { background: #0d47a1; }
+
+        .camera-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #000; z-index: 9998; flex-direction: column;
+        }
+        .camera-overlay.show { display: flex; }
+        .camera-overlay video { flex: 1; object-fit: cover; }
+        .camera-overlay .scan-line {
+            position: absolute; top: 50%; left: 10%; right: 10%; height: 2px;
+            background: #6a1b9a; box-shadow: 0 0 8px #6a1b9a;
+            animation: scanMove 2s ease-in-out infinite;
+        }
+        @keyframes scanMove { 0%,100% { transform: translateY(-60px); } 50% { transform: translateY(60px); } }
+        .camera-overlay .cam-close {
+            position: absolute; top: 16px; right: 16px; z-index: 10;
+            background: rgba(0,0,0,.6); color: #fff; border: none; border-radius: 50%;
+            width: 48px; height: 48px; font-size: 1.5rem; cursor: pointer;
+        }
+        .camera-overlay .cam-status {
+            position: absolute; bottom: 20px; left: 0; right: 0; text-align: center;
+            color: #fff; font-size: 1rem; text-shadow: 0 1px 4px #000;
+        }
+
+        .history-section { background: #fff; border-radius: 10px; padding: .8rem; margin-bottom: .8rem; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+        .history-row { font-size: .85rem; padding: .4rem 0; border-bottom: 1px solid #f0f0f0; }
+        .history-row:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="bi bi-arrow-left-right"></i> Transferir Mercancia</h1>
+        <small id="direction-label"></small>
+    </div>
+    <div class="container">
+        <div class="scan-section">
+            <div class="mb-2 d-flex align-items-center justify-content-center gap-2">
+                <label for="target-select" style="font-size:.85rem;color:#888;">Enviar a:</label>
+                <select id="target-select" class="form-select form-select-sm" style="width:auto;" onchange="onTargetChange()"></select>
+            </div>
+            <input type="text" id="barcode" class="form-control scan-input" placeholder="Codigo de barras..." autofocus autocomplete="off">
+            <button class="btn-camera" onclick="startCamera()">
+                <i class="bi bi-camera-fill"></i> Escanear con Camara
+            </button>
+            <div class="scan-status" id="scan-status">Escanea productos para transferir</div>
+            <div class="form-check form-switch mt-2 d-flex align-items-center justify-content-center gap-2">
+                <input class="form-check-input" type="checkbox" id="force-mode" style="cursor:pointer;">
+                <label class="form-check-label" for="force-mode" style="font-size:.85rem;color:#888;cursor:pointer;">
+                    Forzar (ignorar stock en 0)
+                </label>
+            </div>
+        </div>
+
+        <div class="camera-overlay" id="camera-overlay">
+            <button class="cam-close" onclick="stopCamera()"><i class="bi bi-x-lg"></i></button>
+            <video id="cam-video" autoplay playsinline muted></video>
+            <div class="scan-line"></div>
+            <div class="cam-status" id="cam-status">Apunta al codigo de barras...</div>
+        </div>
+
+        <div class="products-section">
+            <div id="products-list">
+                <div class="empty-msg">Escanea un producto para empezar</div>
+            </div>
+        </div>
+
+        <div class="summary-section" id="summary-section" style="display:none;">
+            <div class="summary-row">
+                <span>Productos:</span>
+                <span id="total-skus">0</span>
+            </div>
+            <div class="summary-row main">
+                <span>Total piezas:</span>
+                <span id="total-piezas">0</span>
+            </div>
+        </div>
+
+        <button class="btn btn-transfer" id="btn-transfer" disabled onclick="doTransfer()">
+            <i class="bi bi-arrow-left-right"></i> Transferir
+        </button>
+
+        <div class="text-center mb-3">
+            <a href="/" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+        </div>
+
+        <div class="history-section">
+            <h6 style="color:#6a1b9a;"><i class="bi bi-clock-history"></i> Transferencias recientes</h6>
+            <div id="history-list"><div class="text-muted text-center py-2" style="font-size:.85rem;">Cargando...</div></div>
+        </div>
+    </div>
+
+    <div class="success-overlay" id="success-overlay">
+        <div class="success-card">
+            <div class="check"><i class="bi bi-check-circle-fill"></i></div>
+            <h3>Transferencia Completada</h3>
+            <div id="success-details"></div>
+            <button class="btn btn-lg mt-3" style="background:#6a1b9a;color:#fff;" onclick="newTransfer()">Nueva Transferencia</button>
+            <a href="/" class="btn btn-outline-secondary btn-lg mt-2 d-block">Volver al Menu</a>
+        </div>
+    </div>
+
+    <script>
+        // Config injected by the backend
+        const BRANCH_LABELS = { terex1: 'Sucursal 1', terex2: 'Sucursal 2', terex3: 'Sucursal 3' };
+        const SOURCE_BRANCH = '{{ source_branch }}';  // terex1, terex2 or terex3
+        const SOURCE_LABEL = BRANCH_LABELS[SOURCE_BRANCH] || SOURCE_BRANCH;
+        const OTHER_BRANCHES = Object.keys(BRANCH_LABELS).filter(b => b !== SOURCE_BRANCH);
+        let TARGET_BRANCH = OTHER_BRANCHES[0];
+        let TARGET_LABEL = BRANCH_LABELS[TARGET_BRANCH];
+
+        const targetSelect = document.getElementById('target-select');
+        targetSelect.innerHTML = OTHER_BRANCHES.map(b => `<option value="${b}">${BRANCH_LABELS[b]}</option>`).join('');
+        targetSelect.value = TARGET_BRANCH;
+
+        function onTargetChange() {
+            TARGET_BRANCH = targetSelect.value;
+            TARGET_LABEL = BRANCH_LABELS[TARGET_BRANCH];
+            document.getElementById('direction-label').textContent = `${SOURCE_LABEL} → ${TARGET_LABEL}`;
+        }
+
+        document.getElementById('direction-label').textContent = `${SOURCE_LABEL} → ${TARGET_LABEL}`;
+
+        let products = [];
+        const barcodeInput = document.getElementById('barcode');
+
+        barcodeInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const code = this.value.trim();
+                if (code) lookupProduct(code);
+                this.value = '';
+            }
+        });
+        barcodeInput.addEventListener('paste', function() {
+            setTimeout(() => {
+                const code = this.value.trim();
+                if (code) lookupProduct(code);
+                this.value = '';
+            }, 100);
+        });
+
+        async function lookupProduct(code) {
+            const status = document.getElementById('scan-status');
+            status.textContent = 'Buscando ' + code + '...';
+
+            const existing = products.find(p => p.codigo === code);
+            if (existing) {
+                existing.qty += 1;
+                renderProducts();
+                status.textContent = code + ' (+1)';
+                barcodeInput.focus();
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/search_barcode?barcode=' + encodeURIComponent(code));
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    status.textContent = 'No encontrado: ' + code + (err.detail ? ` (${err.detail})` : '');
+                    status.style.color = '#d32f2f';
+                    setTimeout(() => { status.style.color = '#888'; }, 2000);
+                    return;
+                }
+                const data = await res.json();
+
+                if (!data || (!data.name && !data.barcode)) {
+                    status.textContent = 'No encontrado: ' + code;
+                    status.style.color = '#d32f2f';
+                    setTimeout(() => { status.style.color = '#888'; }, 2000);
+                    return;
+                }
+
+                const sourceStock = data[SOURCE_BRANCH] || 0;
+                const forceMode = document.getElementById('force-mode').checked;
+                if (sourceStock <= 0 && !forceMode) {
+                    status.textContent = 'Sin stock en ' + SOURCE_LABEL + ': ' + code + ' (activa Forzar)';
+                    status.style.color = '#d32f2f';
+                    setTimeout(() => { status.style.color = '#888'; }, 2000);
+                    return;
+                }
+
+                products.push({
+                    codigo: code,
+                    name: data.name || code,
+                    estilo: data.estilo || '',
+                    source_stock: sourceStock,
+                    qty: 1,
+                    forced: sourceStock <= 0
+                });
+
+                renderProducts();
+                const forceTag = sourceStock <= 0 ? ' (FORZADO)' : '';
+                status.textContent = 'Agregado: ' + (data.name || code) + forceTag;
+                status.style.color = sourceStock <= 0 ? '#e65100' : '#6a1b9a';
+                setTimeout(() => { status.style.color = '#888'; }, 2000);
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                status.style.color = '#d32f2f';
+            }
+            barcodeInput.focus();
+        }
+
+        function renderProducts() {
+            const list = document.getElementById('products-list');
+            const summary = document.getElementById('summary-section');
+            const btn = document.getElementById('btn-transfer');
+
+            if (products.length === 0) {
+                list.innerHTML = '<div class="empty-msg">Escanea un producto para empezar</div>';
+                summary.style.display = 'none';
+                btn.disabled = true;
+                return;
+            }
+
+            btn.disabled = false;
+            summary.style.display = 'block';
+
+            let totalPiezas = 0;
+            let html = '';
+            products.forEach((p, i) => {
+                totalPiezas += p.qty;
+                const forceBadge = p.forced ? '<span style="color:#e65100;font-weight:700;font-size:.7rem;"> FORZADO</span>' : '';
+                const stockColor = p.forced ? '#e65100' : '#6a1b9a';
+                html += `
+                    <div class="product-row" style="${p.forced ? 'background:#fff3e0;' : ''}">
+                        <div class="prod-qty">${p.qty}</div>
+                        <div class="prod-info">
+                            <div class="prod-name">${p.name}${forceBadge}</div>
+                            <div class="prod-code">${p.codigo}</div>
+                            <div class="prod-stock" style="color:${stockColor}">Stock ${SOURCE_LABEL}: ${p.source_stock}</div>
+                        </div>
+                        <div class="prod-remove" onclick="removeProduct(${i})"><i class="bi bi-x-circle"></i></div>
+                    </div>`;
+            });
+            list.innerHTML = html;
+            document.getElementById('total-skus').textContent = products.length;
+            document.getElementById('total-piezas').textContent = totalPiezas;
+        }
+
+        function removeProduct(i) {
+            products.splice(i, 1);
+            renderProducts();
+        }
+
+        async function doTransfer() {
+            const btn = document.getElementById('btn-transfer');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Transfiriendo...';
+
+            try {
+                const hasForced = products.some(p => p.forced);
+                const res = await fetch('/api/transferir', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        source: SOURCE_BRANCH,
+                        target: TARGET_BRANCH,
+                        items: products.map(p => ({ barcode: p.codigo, qty: p.qty })),
+                        force: hasForced
+                    })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    alert('Error ' + res.status + ': ' + (err.detail || res.statusText));
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-arrow-left-right"></i> Transferir';
+                    return;
+                }
+                const result = await res.json();
+
+                if (result.ok) {
+                    document.getElementById('success-details').innerHTML = `
+                        <p><strong>${SOURCE_LABEL} → ${TARGET_LABEL}</strong></p>
+                        <p>${result.transferred} productos, ${result.total_qty} piezas</p>
+                    `;
+                    document.getElementById('success-overlay').style.display = 'flex';
+                } else {
+                    alert('Error: ' + (result.detail || 'Error desconocido'));
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-left-right"></i> Transferir';
+        }
+
+        function newTransfer() {
+            products = [];
+            renderProducts();
+            document.getElementById('success-overlay').style.display = 'none';
+            barcodeInput.focus();
+            loadHistory();
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/transferencias?limit=10');
+                const data = await res.json();
+                const container = document.getElementById('history-list');
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<div class="text-muted text-center py-2" style="font-size:.85rem;">Sin transferencias recientes</div>';
+                    return;
+                }
+                const SHORT_LABELS = { terex1: 'S1', terex2: 'S2', terex3: 'S3' };
+                container.innerHTML = data.map(t => {
+                    const dir = `${SHORT_LABELS[t.source] || t.source} → ${SHORT_LABELS[t.target] || t.target}`;
+                    const _ca = t.created_at && !(t.created_at.endsWith('Z') || t.created_at.includes('+')) ? t.created_at + 'Z' : t.created_at;
+                    const date = _ca ? new Date(_ca).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+                    return `<div class="history-row"><strong>${dir}</strong> ${t.total_qty} pzas (${t.item_count} SKUs) <span class="text-muted">${date}</span></div>`;
+                }).join('');
+            } catch (e) {
+                document.getElementById('history-list').innerHTML = '';
+            }
+        }
+
+        // Camera scanner
+        let camStream = null, scanInterval = null;
+        async function startCamera() {
+            const overlay = document.getElementById('camera-overlay');
+            const video = document.getElementById('cam-video');
+            const camStatus = document.getElementById('cam-status');
+            overlay.classList.add('show');
+            camStatus.textContent = 'Iniciando camara...';
+            try {
+                camStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                video.srcObject = camStream;
+                await video.play();
+                camStatus.textContent = 'Apunta al codigo de barras...';
+                if ('BarcodeDetector' in window) {
+                    const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code'] });
+                    scanInterval = setInterval(async () => {
+                        try {
+                            const barcodes = await detector.detect(video);
+                            if (barcodes.length > 0) {
+                                camStatus.textContent = 'Encontrado: ' + barcodes[0].rawValue;
+                                stopCamera();
+                                lookupProduct(barcodes[0].rawValue);
+                            }
+                        } catch (e) {}
+                    }, 300);
+                } else {
+                    camStatus.textContent = 'BarcodeDetector no disponible. Usa el campo de texto.';
+                }
+            } catch (err) {
+                camStatus.textContent = 'Error: ' + err.message;
+                setTimeout(() => stopCamera(), 2000);
+            }
+        }
+        function stopCamera() {
+            if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+            if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+            document.getElementById('camera-overlay').classList.remove('show');
+            barcodeInput.focus();
+        }
+
+        loadHistory();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

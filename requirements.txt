@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+requests
+httpx
+pytz
+reportlab
+qrcode[pil]
+Pillow
+python-multipart
+jinja2
+apscheduler
+python-dotenv

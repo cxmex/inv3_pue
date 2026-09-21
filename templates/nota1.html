@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nota - Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .row { display: flex; gap: 10px; margin: 10px 0; align-items: center; }
+    .btn { padding: 8px 15px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
+    input[type="text"] { padding: 8px; width: 300px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    .loyalty-row { background-color: #e8f5e9; }
+    .discount-row { background-color: #fff3e0; }
+    .status { margin-left: 10px; color: #666; }
+    .error { color: red; }
+    .success { color: green; }
+    .qty-counter { 
+      background: #2196f3; 
+      color: white; 
+      padding: 15px 20px; 
+      border-radius: 8px; 
+      display: inline-block;
+      margin: 10px 0;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .discount-badge {
+      background: #4caf50;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 14px;
+      margin-left: 10px;
+    }
+    .total-section {
+      background: #f5f5f5;
+      font-weight: bold;
+    }
+    .ac-wrap { position: relative; display: inline-block; }
+    .ac-list {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1px solid #ccc; border-top: none;
+      max-height: 220px; overflow-y: auto; z-index: 50;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.08); display: none;
+    }
+    .ac-item { padding: 6px 10px; cursor: pointer; font-size: 14px; }
+    .ac-item:hover { background: #fffde7; }
+    .ac-item .small { color: #888; font-size: 12px; }
+    .ac-empty { padding: 8px 10px; color: #888; font-size: 13px; }
+    .cliente-badge {
+      display: inline-block; background: #ffeb3b; color: #5d4037;
+      padding: 4px 10px; border-radius: 12px; font-weight: bold; margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Nota - Test Version</h1>
+  
+  <div class="qty-counter">
+    Total Piezas: <span id="total-qty">0</span>
+    <span id="discount-badge"></span>
+  </div>
+  
+  <div class="row">
+    <input id="barcode" type="text" placeholder="Escanea o ingresa código..." autofocus />
+    <button id="btn-add" class="btn">Buscar</button>
+    <span id="status" class="status"></span>
+  </div>
+
+  <div class="row" style="background:#fff8e1; padding:8px; border-radius:6px; border:1px solid #ffc107; flex-wrap:wrap;">
+    <strong style="color:#5d4037;">Buscar cliente:</strong>
+    <div class="ac-wrap">
+      <input id="cliente-name" type="text" placeholder="Nombre..." style="width:200px; background:white;" autocomplete="off" />
+      <div id="cliente-name-results" class="ac-list"></div>
+    </div>
+    <div class="ac-wrap">
+      <input id="cliente-whatsapp" type="text" placeholder="WhatsApp..." style="width:160px; background:white;" autocomplete="off" />
+      <div id="cliente-whatsapp-results" class="ac-list"></div>
+    </div>
+    <button id="btn-new-cliente" class="btn" type="button">+ Nuevo Cliente</button>
+    <span id="cliente-selected"></span>
+  </div>
+
+  <div id="new-cliente-form" class="row" style="display:none; background:#e3f2fd; padding:10px; border-radius:6px; border:1px solid #2196f3; flex-wrap:wrap;">
+    <strong style="color:#0d47a1;">Nuevo Cliente:</strong>
+    <input id="new-cliente-name" type="text" placeholder="Nombre" style="width:200px;" />
+    <input id="new-cliente-whatsapp" type="text" placeholder="WhatsApp" style="width:160px;" />
+    <button id="btn-save-new-cliente" class="btn" type="button">Guardar</button>
+    <button id="btn-cancel-new-cliente" class="btn" type="button">Cancelar</button>
+    <span id="new-cliente-status" class="status"></span>
+  </div>
+
+  <div class="row" style="background:#e8f5e9; padding:8px; border-radius:6px; border:1px solid #4caf50;">
+    <label for="cliente-barcode" style="font-weight:bold; color:#2e7d32;">Cliente (barcode):</label>
+    <input id="cliente-barcode" type="text" placeholder="Escanea el barcode del cliente aqui" style="width:320px; background:white;" />
+    <span id="cliente-status" class="status"></span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Cantidad</th>
+        <th>Producto</th>
+        <th>Código</th>
+        <th>Precio</th>
+        <th>Subtotal</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4"><strong>SUBTOTAL</strong></td>
+        <td id="subtotal"><strong>$0</strong></td>
+        <td></td>
+      </tr>
+      <tr id="discount-row" style="display: none;">
+        <td colspan="4"><strong>DESCUENTO</strong></td>
+        <td id="discount-amount" style="color: #4caf50;"><strong>-$0</strong></td>
+        <td></td>
+      </tr>
+      <tr class="total-section">
+        <td colspan="4"><strong>TOTAL</strong></td>
+        <td id="total"><strong>$0</strong></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="row">
+    <button id="btn-save" class="btn">Guardar Venta</button>
+    <span id="save-msg" class="status"></span>
+  </div>
+
+  <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin: 10px 0;">
+    <strong>Método de Pago:</strong>
+    <label style="margin-left: 15px;">
+      <input type="radio" name="payment-method" value="efectivo" checked> 💵 Efectivo
+    </label>
+    <label style="margin-left: 15px;">
+      <input type="radio" name="payment-method" value="transferencia"> 💳 Transferencia
+    </label>
+  </div>
+
+  <script>
+    const barcodeInput = document.getElementById('barcode');
+    const statusEl = document.getElementById('status');
+    const tbody = document.getElementById('tbody');
+    const totalQtyEl = document.getElementById('total-qty');
+    const subtotalEl = document.getElementById('subtotal');
+    const discountRow = document.getElementById('discount-row');
+    const discountAmountEl = document.getElementById('discount-amount');
+    const totalEl = document.getElementById('total');
+    const discountBadge = document.getElementById('discount-badge');
+    const addBtn = document.getElementById('btn-add');
+    const saveBtn = document.getElementById('btn-save');
+    const saveMsg = document.getElementById('save-msg');
+
+    function fmt(n) { 
+      return '$' + Math.round(Number(n || 0));
+    }
+
+    function getDiscountPerPiece(totalQty) {
+      if (totalQty > 100) return 10;
+      if (totalQty > 50) return 5;
+      return 0;
+    }
+
+    function recalcTotal() {
+      let subtotalBeforeDiscount = 0;
+      let totalQty = 0;
+      
+      const rows = [];
+      tbody.querySelectorAll('tr').forEach(tr => {
+        const qtyInput = tr.querySelector('.qty');
+        const priceInput = tr.querySelector('.price');
+        const qty = parseInt(qtyInput.value || 0);
+        const originalPrice = Math.round(parseFloat(priceInput.getAttribute('data-original-price') || priceInput.value || 0));
+        
+        rows.push({ tr, qtyInput, priceInput, qty, originalPrice });
+        subtotalBeforeDiscount += qty * originalPrice;
+        totalQty += qty;
+      });
+      
+      totalQtyEl.textContent = totalQty;
+      
+      const discountPerPiece = getDiscountPerPiece(totalQty);
+      
+      if (discountPerPiece > 0) {
+        rows.forEach(({ tr, priceInput, qty, originalPrice }) => {
+          const discountedPrice = Math.max(0, originalPrice - discountPerPiece);
+          priceInput.value = Math.round(discountedPrice);
+          tr.querySelector('.subtotal').textContent = fmt(qty * discountedPrice);
+        });
+      } else {
+        rows.forEach(({ tr, priceInput, qty, originalPrice }) => {
+          priceInput.value = Math.round(originalPrice);
+          tr.querySelector('.subtotal').textContent = fmt(qty * originalPrice);
+        });
+      }
+      
+      let subtotalAfterDiscount = 0;
+      tbody.querySelectorAll('tr').forEach(tr => {
+        const qty = parseInt(tr.querySelector('.qty').value || 0);
+        const price = parseFloat(tr.querySelector('.price').value || 0);
+        subtotalAfterDiscount += qty * price;
+      });
+      
+      const totalDiscountAmount = discountPerPiece > 0 ? (totalQty * discountPerPiece) : 0;
+      
+      subtotalEl.innerHTML = '<strong>' + fmt(subtotalBeforeDiscount) + '</strong>';
+      
+      if (discountPerPiece > 0) {
+        discountRow.style.display = 'table-row';
+        discountAmountEl.innerHTML = '<strong>-' + fmt(totalDiscountAmount) + '</strong>';
+        discountBadge.innerHTML = `<span class="discount-badge">-$${discountPerPiece} por pieza!</span>`;
+      } else {
+        discountRow.style.display = 'none';
+        discountBadge.innerHTML = '';
+      }
+      
+      totalEl.innerHTML = '<strong>' + fmt(subtotalAfterDiscount) + '</strong>';
+    }
+
+    function addProductRow(data) {
+      const tr = document.createElement('tr');
+      
+      const isLoyalty = data.is_loyalty || false;
+      const isDiscount = data.price < 0;
+      
+      if (isLoyalty) {
+        tr.className = isDiscount ? 'discount-row' : 'loyalty-row';
+        if (data.customer_email) {
+          tr.setAttribute('data-customer-email', data.customer_email);
+        }
+      }
+      
+      const originalPrice = Math.round(data.price || 0);
+      
+      tr.innerHTML = `
+        <td><input type="number" class="qty" value="1" min="1" style="width:60px" ${isLoyalty ? 'readonly' : ''}></td>
+        <td><input type="text" class="name" value="${data.name || ''}" style="width:200px" ${isLoyalty ? 'readonly' : ''}></td>
+        <td class="codigo">${data.codigo || ''}</td>
+        <td><input type="number" class="price" value="${originalPrice}" data-original-price="${originalPrice}" step="1" style="width:80px" ${isLoyalty ? 'readonly' : ''}></td>
+        <td class="subtotal">${fmt(data.price || 0)}</td>
+        <td><button class="btn" onclick="removeRow(this)">Quitar</button></td>
+      `;
+      
+      tbody.appendChild(tr);
+      
+      tr.querySelector('.qty').addEventListener('input', recalcTotal);
+      tr.querySelector('.price').addEventListener('input', function() {
+        this.setAttribute('data-original-price', this.value);
+        recalcTotal();
+      });
+      
+      recalcTotal();
+    }
+
+    function removeRow(btn) {
+      btn.closest('tr').remove();
+      recalcTotal();
+    }
+
+    async function searchBarcode() {
+      const barcode = barcodeInput.value.trim();
+      if (!barcode) return;
+      
+      statusEl.textContent = 'Buscando...';
+      statusEl.className = 'status';
+      
+      try {
+        console.log('Searching for barcode:', barcode);
+        
+        const response = await fetch(`/api/search_barcode?barcode=${encodeURIComponent(barcode)}`);
+        const data = await response.json();
+        
+        console.log('API Response:', data);
+        
+        if (!response.ok) {
+          throw new Error(data.detail || 'Error en la búsqueda');
+        }
+        
+        addProductRow(data);
+        
+        if (data.is_loyalty) {
+          statusEl.textContent = `Cliente: ${data.customer_email} - Saldo: ${fmt(Math.abs(data.price))}`;
+          statusEl.className = 'status success';
+        } else {
+          statusEl.textContent = 'Producto agregado';
+          statusEl.className = 'status success';
+        }
+        
+        barcodeInput.value = '';
+        // Send product photo to Telegram on scan
+        fetch(`/api/barcode-photo/${encodeURIComponent(barcode)}`)
+          .catch(err => console.error('Barcode photo error:', err));
+        fetch(`/api/start_camera_capture?barcode=${encodeURIComponent(barcode)}`, {
+          method: 'POST'
+        }).catch(err => console.error('Camera capture error:', err));
+        
+      } catch (error) {
+        console.error('Search error:', error);
+        statusEl.textContent = `Error: ${error.message}`;
+        statusEl.className = 'status error';
+      }
+      
+      setTimeout(() => {
+        if (statusEl.className.includes('success')) {
+          statusEl.textContent = '';
+        }
+      }, 3000);
+    }
+
+    function getProducts() {
+      const products = [];
+      tbody.querySelectorAll('tr').forEach(tr => {
+        const product = {
+          qty: parseInt(tr.querySelector('.qty').value || 0),
+          name: tr.querySelector('.name').value || '',
+          codigo: tr.querySelector('.codigo').textContent.trim(),
+          price: Math.round(parseFloat(tr.querySelector('.price').value || 0))
+        };
+        
+        const customerEmail = tr.getAttribute('data-customer-email');
+        if (customerEmail) {
+          product.customer_email = customerEmail;
+        }
+        
+        products.push(product);
+      });
+      return products;
+    }
+
+    async function saveTransaction() {
+      const products = getProducts();
+
+      if (products.length === 0) {
+        saveMsg.textContent = 'Agrega productos primero';
+        saveMsg.className = 'status error';
+        return;
+      }
+
+      // Check for $0 prices
+      const zeroItems = products.filter(p => !p.price || p.price <= 0);
+      if (zeroItems.length > 0) {
+        const names = zeroItems.map(p => p.name || p.codigo).join(', ');
+        if (!confirm(`⚠️ Hay mercancia con $0 en el precio:\n\n${names}\n\n¿Estas seguro que la quieres vender gratis?`)) {
+          saveMsg.textContent = 'Corrige los precios antes de guardar';
+          saveMsg.className = 'status error';
+          saveBtn.disabled = false;
+          return;
+        }
+      }
+
+      const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+
+      saveBtn.disabled = true;
+      saveMsg.textContent = 'Guardando...';
+      saveMsg.className = 'status';
+
+      try {
+        console.log('Saving products:', products);
+        console.log('Payment method:', paymentMethod);
+        console.log('Cliente:', selectedCliente);
+
+        // Generate unique idempotency key to prevent double submissions
+        const idempotencyKey = Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+
+        const body = {
+          products: products,
+          payment_method: paymentMethod,
+          idempotency_key: idempotencyKey,
+        };
+        if (selectedCliente) {
+          body.cliente_id = selectedCliente.id;
+          body.cliente = selectedCliente.cliente || null;
+          body.whatsapp = selectedCliente.whatsapp || null;
+        }
+
+        const response = await fetch('/api/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+          let errorMsg = 'Error al guardar';
+          try {
+            const error = await response.json();
+            errorMsg = error.detail || errorMsg;
+          } catch(e) {
+            errorMsg = `Error ${response.status}: ${response.statusText}`;
+          }
+          if (response.status === 409) {
+            // Duplicate — sale already saved, just clear and show success
+            tbody.innerHTML = '';
+            recalcTotal();
+            clearSelectedCliente();
+            saveMsg.textContent = '⚠️ Esta venta ya se guardó — no se duplicó';
+            saveMsg.className = 'status success';
+            saveBtn.disabled = false;
+            return;
+          }
+          throw new Error(errorMsg);
+        }
+        
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ticket.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        
+        tbody.innerHTML = '';
+        recalcTotal();
+        clearSelectedCliente();
+
+        saveMsg.textContent = 'Venta guardada y ticket descargado ✅';
+        saveMsg.className = 'status success';
+        
+      } catch (error) {
+        console.error('Save error:', error);
+        saveMsg.textContent = `Error: ${error.message}`;
+        saveMsg.className = 'status error';
+      } finally {
+        saveBtn.disabled = false;
+        setTimeout(() => {
+          if (saveMsg.className.includes('success')) {
+            saveMsg.textContent = '';
+          }
+        }, 3000);
+      }
+    }
+
+    // ─── Customer picker (name + WhatsApp) ─────────────────────────────
+    let selectedCliente = null;
+
+    const clienteNameInput = document.getElementById('cliente-name');
+    const clienteWhatsappInput = document.getElementById('cliente-whatsapp');
+    const clienteNameResults = document.getElementById('cliente-name-results');
+    const clienteWhatsappResults = document.getElementById('cliente-whatsapp-results');
+    const clienteSelectedEl = document.getElementById('cliente-selected');
+    const newClienteBtn = document.getElementById('btn-new-cliente');
+    const newClienteForm = document.getElementById('new-cliente-form');
+    const newClienteName = document.getElementById('new-cliente-name');
+    const newClienteWhatsapp = document.getElementById('new-cliente-whatsapp');
+    const saveNewClienteBtn = document.getElementById('btn-save-new-cliente');
+    const cancelNewClienteBtn = document.getElementById('btn-cancel-new-cliente');
+    const newClienteStatus = document.getElementById('new-cliente-status');
+
+    function renderClienteBadge() {
+      if (!selectedCliente) {
+        clienteSelectedEl.innerHTML = '';
+        return;
+      }
+      const label = selectedCliente.cliente || selectedCliente.whatsapp || `#${selectedCliente.id}`;
+      const wa = selectedCliente.whatsapp ? ` · ${selectedCliente.whatsapp}` : '';
+      clienteSelectedEl.innerHTML =
+        `<span class="cliente-badge">✅ ${label}${wa}</span>` +
+        ` <button type="button" class="btn" id="btn-clear-cliente" style="padding:2px 8px;">Quitar</button>`;
+      document.getElementById('btn-clear-cliente').onclick = clearSelectedCliente;
+    }
+
+    function clearSelectedCliente() {
+      selectedCliente = null;
+      clienteNameInput.value = '';
+      clienteWhatsappInput.value = '';
+      clienteNameResults.style.display = 'none';
+      clienteWhatsappResults.style.display = 'none';
+      renderClienteBadge();
+    }
+
+    function pickCliente(c) {
+      selectedCliente = c;
+      clienteNameInput.value = c.cliente || '';
+      clienteWhatsappInput.value = c.whatsapp || '';
+      clienteNameResults.style.display = 'none';
+      clienteWhatsappResults.style.display = 'none';
+      renderClienteBadge();
+    }
+
+    function renderClienteResults(container, results) {
+      if (!results || results.length === 0) {
+        container.innerHTML = '<div class="ac-empty">Sin resultados — usa "+ Nuevo Cliente"</div>';
+        container.style.display = 'block';
+        return;
+      }
+      container.innerHTML = results.map(r => {
+        const name = r.cliente || '(sin nombre)';
+        const wa = r.whatsapp ? `<span class="small"> · ${r.whatsapp}</span>` : '';
+        const city = r.city ? `<span class="small"> · ${r.city}</span>` : '';
+        return `<div class="ac-item" data-id="${r.id}">${name}${wa}${city}</div>`;
+      }).join('');
+      container.style.display = 'block';
+      container.querySelectorAll('.ac-item').forEach(el => {
+        el.onclick = () => {
+          const id = parseInt(el.getAttribute('data-id'));
+          const c = results.find(r => r.id === id);
+          if (c) pickCliente(c);
+        };
+      });
+    }
+
+    function debounce(fn, ms) {
+      let t;
+      return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+    }
+
+    async function searchCliente(q, by, container) {
+      q = (q || '').trim();
+      if (q.length < 1) { container.style.display = 'none'; return; }
+      try {
+        const res = await fetch(`/api/search_cliente?q=${encodeURIComponent(q)}&by=${by}`);
+        const data = await res.json();
+        renderClienteResults(container, data);
+      } catch (e) {
+        console.error('searchCliente error:', e);
+      }
+    }
+
+    const onNameInput = debounce(() => searchCliente(clienteNameInput.value, 'name', clienteNameResults), 200);
+    const onWaInput = debounce(() => searchCliente(clienteWhatsappInput.value, 'whatsapp', clienteWhatsappResults), 200);
+    clienteNameInput.addEventListener('input', onNameInput);
+    clienteWhatsappInput.addEventListener('input', onWaInput);
+
+    // Hide dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!clienteNameInput.contains(e.target) && !clienteNameResults.contains(e.target)) {
+        clienteNameResults.style.display = 'none';
+      }
+      if (!clienteWhatsappInput.contains(e.target) && !clienteWhatsappResults.contains(e.target)) {
+        clienteWhatsappResults.style.display = 'none';
+      }
+    });
+
+    // ─── New customer form ─────────────────────────────────────────────
+    newClienteBtn.addEventListener('click', () => {
+      newClienteForm.style.display = newClienteForm.style.display === 'none' ? 'flex' : 'none';
+      newClienteName.value = clienteNameInput.value || '';
+      newClienteWhatsapp.value = clienteWhatsappInput.value || '';
+      newClienteStatus.textContent = '';
+      if (newClienteForm.style.display !== 'none') newClienteName.focus();
+    });
+
+    cancelNewClienteBtn.addEventListener('click', () => {
+      newClienteForm.style.display = 'none';
+      newClienteStatus.textContent = '';
+    });
+
+    saveNewClienteBtn.addEventListener('click', async () => {
+      const name = newClienteName.value.trim();
+      const wa = newClienteWhatsapp.value.trim();
+      if (!name && !wa) {
+        newClienteStatus.textContent = 'Nombre o WhatsApp requerido';
+        newClienteStatus.className = 'status error';
+        return;
+      }
+      saveNewClienteBtn.disabled = true;
+      newClienteStatus.textContent = 'Guardando...';
+      newClienteStatus.className = 'status';
+      try {
+        const res = await fetch('/api/create_cliente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cliente: name, whatsapp: wa })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || 'Error');
+        }
+        const c = await res.json();
+        pickCliente(c);
+        newClienteForm.style.display = 'none';
+        newClienteName.value = '';
+        newClienteWhatsapp.value = '';
+        newClienteStatus.textContent = '';
+      } catch (e) {
+        newClienteStatus.textContent = `Error: ${e.message}`;
+        newClienteStatus.className = 'status error';
+      } finally {
+        saveNewClienteBtn.disabled = false;
+      }
+    });
+
+    // Event listeners
+    addBtn.addEventListener('click', searchBarcode);
+    barcodeInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        searchBarcode();
+      }
+    });
+    saveBtn.addEventListener('click', saveTransaction);
+
+    // Cliente input: on Enter/scan, dispatch to main search flow
+    const clienteInput = document.getElementById('cliente-barcode');
+    const clienteStatus = document.getElementById('cliente-status');
+    clienteInput.addEventListener('keypress', (e) => {
+      if (e.key !== 'Enter') return;
+      const val = clienteInput.value.trim();
+      if (!val) return;
+      clienteStatus.textContent = 'Buscando cliente...';
+      clienteStatus.className = 'status';
+      barcodeInput.value = val;
+      searchBarcode().then(() => {
+        clienteStatus.textContent = 'Cliente agregado';
+        clienteStatus.className = 'status success';
+        setTimeout(() => { clienteStatus.textContent = ''; }, 2500);
+      }).catch(() => {
+        clienteStatus.textContent = 'Error';
+        clienteStatus.className = 'status error';
+      });
+      clienteInput.value = '';
+    });
+
+    // Test buttons for debugging
+    document.body.insertAdjacentHTML('beforeend', `
+      <div style="margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+        <h3>Test Buttons</h3>
+        <button class="btn" onclick="testProduct()">Test Product (7000401241135)</button>
+        <button class="btn" onclick="testCustomer()">Test Customer (8000123456780)</button>
+        <div style="margin-top: 10px;">
+          <strong>Debug Info:</strong>
+          <div id="debug" style="font-family: monospace; font-size: 12px; color: #666;"></div>
+        </div>
+      </div>
+    `);
+
+    function testProduct() {
+      barcodeInput.value = '7000401241135';
+      searchBarcode();
+    }
+
+    function testCustomer() {
+      barcodeInput.value = '8000123456780';
+      searchBarcode();
+    }
+
+    async function checkAPI() {
+      try {
+        const response = await fetch('/health');
+        const data = await response.json();
+        document.getElementById('debug').innerHTML = `API Status: ${data.status}`;
+      } catch (error) {
+        document.getElementById('debug').innerHTML = `API Error: ${error.message}`;
+      }
+    }
+
+    checkAPI();
+    fetch('/api/sync_prices')
+      .then(r => r.json())
+      .then(d => console.log('✅ Prices synced:', d.updated))
+      .catch(e => console.error('Sync error:', e));
+  </script>
+</body>
+</html>

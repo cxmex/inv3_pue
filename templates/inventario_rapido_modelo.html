@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inventario por Modelo — Terex 3</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body { background:#f4f4f4; }
+#search-input { font-size:1rem; border:2px solid #c62828; border-radius:10px; }
+#search-input:focus { border-color:#c62828; box-shadow:0 0 0 3px rgba(198,40,40,.15); outline:none; }
+#suggestions { position:absolute; z-index:200; background:#fff; border:1px solid #ddd; border-radius:8px; width:100%; max-height:220px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,.12); display:none; }
+.suggestion-item { padding:8px 14px; cursor:pointer; font-size:.88rem; border-bottom:1px solid #f5f5f5; }
+.suggestion-item:hover { background:#ffeaea; }
+.rank-row { display:flex; align-items:center; padding:8px 14px; border-bottom:1px solid #eee; cursor:pointer; transition:.1s; }
+.rank-row:hover { background:#fff5f5; }
+.rank-num { font-size:.75rem; color:#aaa; min-width:32px; font-weight:600; }
+.rank-modelo { flex:1; font-size:.88rem; font-weight:600; }
+.estilo-row { display:flex; justify-content:space-between; padding:7px 14px; border-bottom:1px solid #f0f0f0; font-size:.83rem; }
+.detail-header { background:#c62828; color:#fff; padding:10px 14px; font-weight:700; font-size:.9rem; display:flex; justify-content:space-between; align-items:center; }
+.total-footer { background:#1a1a1a; color:#fff; padding:8px 14px; font-weight:700; font-size:.88rem; display:flex; justify-content:space-between; border-radius:0 0 10px 10px; }
+#detail-panel { display:none; position:fixed; top:0; right:0; width:340px; height:100vh; background:#fff; z-index:300; box-shadow:-4px 0 20px rgba(0,0,0,.15); overflow-y:auto; flex-direction:column; }
+#overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:299; }
+.badge-t2 { background:#c62828; color:#fff; font-size:.68rem; padding:2px 7px; border-radius:8px; }
+#loading { text-align:center; padding:40px; color:#aaa; font-size:.9rem; }
+</style>
+</head>
+<body>
+
+<div style="max-width:600px; margin:0 auto; padding:16px">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <a href="/" style="color:#c62828;font-size:1.3rem;text-decoration:none">&#8592;</a>
+    <div>
+      <div style="font-size:1.05rem;font-weight:700;line-height:1.1">Inventario por Modelo</div>
+      <div style="font-size:.72rem;color:#888">Terex 3 · stock actual · toca un modelo para ver por estilo</div>
+    </div>
+    <span class="badge-t2 ms-auto">T2</span>
+  </div>
+
+  <!-- Search -->
+  <div class="position-relative mb-3">
+    <input id="search-input" type="text" class="form-control py-2 px-3" placeholder="Filtrar modelo..." autocomplete="off">
+    <div id="suggestions"></div>
+  </div>
+
+  <!-- Ranking list -->
+  <div class="card shadow-sm" style="border-radius:10px; overflow:hidden">
+    <div style="background:#c62828;color:#fff;padding:8px 14px;font-size:.8rem;font-weight:700">
+      MODELOS
+    </div>
+    <div id="ranking-list">
+      <div id="loading">Cargando...</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Overlay -->
+<div id="overlay" onclick="closeDetail()"></div>
+
+<!-- Detail panel -->
+<div id="detail-panel">
+  <div class="detail-header">
+    <span id="detail-title">—</span>
+    <button onclick="closeDetail()" style="background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer">✕</button>
+  </div>
+  <div style="padding:28px 20px">
+    <div style="font-size:.8rem;color:#888;margin-bottom:8px">CANTIDAD CONTADA</div>
+    <input id="qty-input" type="number" min="0" inputmode="numeric"
+      style="width:100%;font-size:2rem;font-weight:700;border:2px solid #c62828;border-radius:10px;padding:12px 16px;text-align:center;outline:none"
+      placeholder="0">
+    <button onclick="saveConteo()" style="width:100%;margin-top:16px;background:#c62828;color:#fff;border:none;border-radius:10px;padding:14px;font-size:1rem;font-weight:700;cursor:pointer">
+      GUARDAR
+    </button>
+    <div id="save-msg" style="margin-top:12px;text-align:center;font-size:.85rem;color:#2e7d32;display:none">Guardado</div>
+  </div>
+</div>
+
+<script>
+let allRows = [];
+let filtered = [];
+
+async function loadRanking() {
+  const r = await fetch('/api/inventario-rapido-modelo/ranking');
+  allRows = await r.json();
+  filtered = allRows;
+  renderList(allRows);
+}
+
+function renderList(rows) {
+  const list = document.getElementById('ranking-list');
+  if (!rows.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-size:.85rem">Sin resultados</div>';
+    return;
+  }
+  list.innerHTML = rows.map((r, i) => `
+    <div class="rank-row" onclick="openDetail('${r.modelo.replace(/'/g,"\\'")}')">
+      <span class="rank-num">${r.rank}</span>
+      <span class="rank-modelo">${r.modelo}</span>
+    </div>`).join('');
+}
+
+// Search/filter
+const input = document.getElementById('search-input');
+input.addEventListener('input', () => {
+  const q = input.value.trim().toUpperCase();
+  if (!q) { filtered = allRows; renderList(allRows); document.getElementById('suggestions').style.display='none'; return; }
+  filtered = allRows.filter(r => r.modelo.toUpperCase().includes(q));
+  renderList(filtered);
+  // suggestions
+  const matches = filtered.slice(0, 8);
+  if (matches.length && q.length > 1) {
+    document.getElementById('suggestions').innerHTML = matches.map(r => `<div class="suggestion-item" onclick="selectModelo('${r.modelo.replace(/'/g,"\\'")}')"> ${r.modelo}</div>`).join('');
+    document.getElementById('suggestions').style.display = '';
+  } else {
+    document.getElementById('suggestions').style.display = 'none';
+  }
+});
+
+document.addEventListener('click', e => { if (!e.target.closest('.position-relative')) document.getElementById('suggestions').style.display='none'; });
+
+function selectModelo(m) {
+  input.value = m;
+  document.getElementById('suggestions').style.display = 'none';
+  filtered = allRows.filter(r => r.modelo.toUpperCase().includes(m.toUpperCase()));
+  renderList(filtered);
+}
+
+let currentModelo = null;
+const SESSION_ID = crypto.randomUUID();
+
+function openDetail(modelo) {
+  currentModelo = modelo;
+  document.getElementById('detail-title').textContent = modelo;
+  document.getElementById('qty-input').value = '';
+  document.getElementById('save-msg').style.display = 'none';
+  document.getElementById('detail-panel').style.display = 'flex';
+  document.getElementById('overlay').style.display = '';
+  setTimeout(() => document.getElementById('qty-input').focus(), 100);
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').style.display = 'none';
+  document.getElementById('overlay').style.display = 'none';
+  currentModelo = null;
+}
+
+async function saveConteo() {
+  const qty = parseInt(document.getElementById('qty-input').value);
+  if (isNaN(qty) || qty < 0) { alert('Ingresa una cantidad valida'); return; }
+  const btn = document.querySelector('#detail-panel button[onclick="saveConteo()"]');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+  const r = await fetch('/api/conteo-por-modelo', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ sucursal: 'terex3', modelo: currentModelo, qty_contada: qty, session_id: SESSION_ID })
+  });
+  btn.disabled = false;
+  btn.textContent = 'GUARDAR';
+  if (r.ok) {
+    document.getElementById('save-msg').style.display = '';
+    setTimeout(closeDetail, 800);
+  } else {
+    alert('Error al guardar');
+  }
+}
+
+loadRanking();
+</script>
+</body>
+</html>
