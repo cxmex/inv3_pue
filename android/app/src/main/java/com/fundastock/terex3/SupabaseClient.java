@@ -70,6 +70,23 @@ public class SupabaseClient {
         }
     }
 
+    /** POST /rest/v1/{table} with a JSON array body — bulk insert. */
+    public JSONArray insertBatch(String table, JSONArray rows) throws IOException, JSONException {
+        RequestBody body = RequestBody.create(rows.toString(), JSON);
+        Request request = baseHeaders(new Request.Builder())
+                .url(Config.SUPABASE_URL + "/rest/v1/" + table)
+                .header("Prefer", "return=representation")
+                .post(body)
+                .build();
+        try (Response resp = http.newCall(request).execute()) {
+            String respBody = resp.body() != null ? resp.body().string() : "[]";
+            if (!resp.isSuccessful()) {
+                throw new IOException("Supabase POST " + table + " (batch) failed: " + resp.code() + " " + respBody);
+            }
+            return new JSONArray(respBody.isEmpty() ? "[]" : respBody);
+        }
+    }
+
     /** PATCH /rest/v1/{table}?filters... */
     public void update(String table, Map<String, String> filters, JSONObject data) throws IOException {
         HttpUrl.Builder urlBuilder = HttpUrl.parse(Config.SUPABASE_URL + "/rest/v1/" + table).newBuilder();

@@ -48,4 +48,62 @@
     <string name="label_diff">Diferencia</string>
     <string name="label_history">Historial terex3 · barcode</string>
     <string name="label_session">Verificados esta sesión</string>
+
+    <!-- Entrada de Mercancía -->
+    <string name="label_qty">Cantidad</string>
+    <string name="label_caja_conteo_previo">Caja de Conteo Previo</string>
+    <string name="btn_registrar_entrada">Registrar Entrada</string>
+    <string name="btn_limpiar">Limpiar</string>
+    <string name="label_entradas_recientes">Entradas Recientes</string>
+    <string name="btn_actualizar">Actualizar</string>
+    <string name="caja_sin_asignar">— Sin caja asignada —</string>
+
+    <!-- Conteo de Efectivo -->
+    <string name="label_saldo_actual">Saldo Actual</string>
+    <string name="label_registrar_movimiento">Registrar Movimiento</string>
+    <string name="hint_descripcion">Descripción</string>
+    <string name="hint_monto">Monto</string>
+    <string name="msg_conteo_info">ℹ️ Conteo de Caja: ingresa el monto real contado. El sistema calculará la diferencia con el saldo esperado.</string>
+    <string name="btn_guardar">💾 Guardar</string>
+    <string name="label_movimientos">📋 Movimientos (Ayer y Hoy)</string>
+
+    <!-- Transferencias -->
+    <string name="label_enviar_a">Enviar a:</string>
+    <string name="label_forzar">Forzar (ignorar stock en 0)</string>
+    <string name="label_productos">Productos:</string>
+    <string name="label_total_piezas2">Total piezas:</string>
+    <string name="btn_transferir">🔁 Transferir</string>
+    <string name="label_transferencias_recientes">🕐 Transferencias recientes</string>
+
+    <!-- Check Barcode Mobile -->
+    <string name="hint_qty_counted_t3">Cantidad Contada — Terex 3</string>
+    <string name="btn_tomar_foto">📷 Tomar foto del producto</string>
+    <string name="btn_checar_simple">CHECAR</string>
+    <string name="msg_foto_guardada">📷 Foto guardada para ML training</string>
+
+    <!-- Conteo Previo -->
+    <string name="tab_nueva_cuenta">Nueva Cuenta</string>
+    <string name="tab_cajas_pendientes">Cajas Pendientes</string>
+    <string name="hint_no_caja">No. Caja</string>
+    <string name="hint_nombre_estilo">Nombre del estilo…</string>
+    <string name="hint_modelo">Modelo</string>
+    <string name="hint_color">Color</string>
+    <string name="btn_tomar_foto_corto">📷 Foto</string>
+    <string name="btn_agregar_linea">+ Agregar línea</string>
+    <string name="btn_agregar_estilo">📷 Agregar Estilo</string>
+    <string name="label_total_piezas_caja">Total piezas</string>
+    <string name="btn_guardar_recibo">GUARDAR Y GENERAR RECIBO</string>
+    <string name="btn_comparar_entradas">COMPARAR CON ENTRADAS</string>
+    <string name="btn_marcar_verificado">✅ Marcar como Verificado</string>
+    <string name="hint_fecha_desde">Fecha desde</string>
+    <string name="hint_fecha_hasta">Fecha hasta</string>
+
+    <!-- Inventario Rápido por Modelo -->
+    <string name="hint_filtrar_modelo">Filtrar modelo…</string>
+    <string name="hint_cantidad_contada">Cantidad Contada</string>
+    <string name="btn_guardar_simple">GUARDAR</string>
+
+    <!-- Conteo Rápido por Estilo -->
+    <string name="msg_ok_para_guardar">Presiona OK para guardar cada estilo</string>
+    <string name="btn_ok_short">OK</string>
 </resources>

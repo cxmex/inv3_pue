@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginBottom="6dp">
+
+    <AutoCompleteTextView
+        android:id="@+id/etModelo"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginEnd="4dp"
+        android:hint="@string/hint_modelo"
+        android:inputType="textCapCharacters"
+        android:completionThreshold="1"
+        android:singleLine="true"
+        android:textSize="13sp" />
+
+    <AutoCompleteTextView
+        android:id="@+id/etColor"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginEnd="4dp"
+        android:hint="@string/hint_color"
+        android:inputType="textCapCharacters"
+        android:completionThreshold="1"
+        android:singleLine="true"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/etQty"
+        android:layout_width="56dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="4dp"
+        android:gravity="center"
+        android:hint="0"
+        android:inputType="number"
+        android:singleLine="true"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/btnDelRow"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:gravity="center"
+        android:text="✕"
+        android:textColor="@color/error"
+        android:textSize="15sp" />
+
+</LinearLayout>
