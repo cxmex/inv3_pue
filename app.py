@@ -1386,7 +1386,7 @@ async def get_conteo_efectivo(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request=request, name="index2.html", context={})
+    return templates.TemplateResponse(request=request, name="index3.html", context={})
 
 # Register router
 app.include_router(router)
