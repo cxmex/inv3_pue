@@ -53,6 +53,27 @@
       display: inline-block; background: #ffeb3b; color: #5d4037;
       padding: 4px 10px; border-radius: 12px; font-weight: bold; margin-left: 10px;
     }
+    .camera-overlay {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #000; z-index: 9998; flex-direction: column;
+    }
+    .camera-overlay.show { display: flex; }
+    .camera-overlay video { flex: 1; object-fit: cover; }
+    .camera-overlay .scan-line {
+      position: absolute; top: 50%; left: 10%; right: 10%; height: 2px;
+      background: #2196f3; box-shadow: 0 0 8px #2196f3;
+      animation: scanMove 2s ease-in-out infinite;
+    }
+    @keyframes scanMove { 0%,100% { transform: translateY(-60px); } 50% { transform: translateY(60px); } }
+    .camera-overlay .cam-close {
+      position: absolute; top: 16px; right: 16px; z-index: 10;
+      background: rgba(0,0,0,.6); color: #fff; border: none; border-radius: 50%;
+      width: 48px; height: 48px; font-size: 1.5rem; cursor: pointer;
+    }
+    .camera-overlay .cam-status {
+      position: absolute; bottom: 20px; left: 0; right: 0; text-align: center;
+      color: #fff; font-size: 1rem; text-shadow: 0 1px 4px #000;
+    }
   </style>
 </head>
 <body>
@@ -67,6 +88,13 @@
     <input id="barcode" type="text" placeholder="Escanea o ingresa código..." autofocus />
     <button id="btn-add" class="btn">Buscar</button>
     <span id="status" class="status"></span>
+  </div>
+
+  <div class="camera-overlay" id="camera-overlay">
+    <button class="cam-close" onclick="stopCamera()">&times;</button>
+    <video id="cam-video" autoplay playsinline muted></video>
+    <div class="scan-line"></div>
+    <div class="cam-status" id="cam-status">Apunta al código de barras...</div>
   </div>
 
   <div class="row" style="background:#fff8e1; padding:8px; border-radius:6px; border:1px solid #ffc107; flex-wrap:wrap;">
@@ -158,8 +186,56 @@
     const saveBtn = document.getElementById('btn-save');
     const saveMsg = document.getElementById('save-msg');
 
-    function fmt(n) { 
+    function fmt(n) {
       return '$' + Math.round(Number(n || 0));
+    }
+
+    // ─── Mobile camera scanning ─────────────────────────────────────────
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+      addBtn.textContent = '📷 Escanear';
+    }
+
+    let camStream = null, scanInterval = null;
+    async function startCamera() {
+      const overlay = document.getElementById('camera-overlay');
+      const video = document.getElementById('cam-video');
+      const camStatus = document.getElementById('cam-status');
+      overlay.classList.add('show');
+      camStatus.textContent = 'Iniciando cámara...';
+      try {
+        camStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        video.srcObject = camStream;
+        await video.play();
+        camStatus.textContent = 'Apunta al código de barras...';
+        if ('BarcodeDetector' in window) {
+          const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code'] });
+          scanInterval = setInterval(async () => {
+            try {
+              const barcodes = await detector.detect(video);
+              if (barcodes.length > 0) {
+                camStatus.textContent = 'Encontrado: ' + barcodes[0].rawValue;
+                stopCamera();
+                barcodeInput.value = barcodes[0].rawValue;
+                searchBarcode();
+              }
+            } catch (e) {}
+          }, 300);
+        } else {
+          camStatus.textContent = 'Escaneo no disponible en este navegador. Usa el campo de texto.';
+        }
+      } catch (err) {
+        camStatus.textContent = 'Error: ' + err.message;
+        setTimeout(() => stopCamera(), 2000);
+      }
+    }
+    function stopCamera() {
+      if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+      if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+      document.getElementById('camera-overlay').classList.remove('show');
+      barcodeInput.focus();
     }
 
     function getDiscountPerPiece(totalQty) {
@@ -589,7 +665,13 @@
     });
 
     // Event listeners
-    addBtn.addEventListener('click', searchBarcode);
+    addBtn.addEventListener('click', () => {
+      if (isMobile && !barcodeInput.value.trim()) {
+        startCamera();
+      } else {
+        searchBarcode();
+      }
+    });
     barcodeInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         searchBarcode();
