@@ -15,4 +15,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "Terex3POS"
 include ':app'
-include ':doublex1'

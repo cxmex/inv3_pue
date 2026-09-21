@@ -26,6 +26,17 @@ android {
     }
 }
 
+// Glide's transitive deps can resolve kotlin-stdlib-jdk7/jdk8 at a
+// different version than kotlin-stdlib itself, duplicating classes merged
+// into kotlin-stdlib since 1.8. Force one version everywhere to avoid it.
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+    }
+}
+
 dependencies {
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
@@ -47,4 +58,7 @@ dependencies {
 
     // QR code generation for the receipt ticket
     implementation 'com.google.zxing:core:3.5.3'
+
+    // Image loading for the secondary-display marketing carousel
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
 }
