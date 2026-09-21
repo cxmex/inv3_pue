@@ -138,53 +138,47 @@ public class SlideshowActivity extends Activity {
         mainHandler.post(() -> statusScroll.setVisibility(View.GONE));
     }
 
+    /** Cap on how many image URLs we collect, so a bucket with hundreds of
+     *  subfolders doesn't make the periodic refresh unreasonably slow. */
+    private static final int MAX_IMAGES = 400;
+
     private void fetchImageList() {
         executor.execute(() -> {
-            Request request;
             try {
-                JSONObject sortBy = new JSONObject()
-                        .put("column", "name")
-                        .put("order", "asc");
-                JSONObject body = new JSONObject()
-                        .put("prefix", "")
-                        .put("limit", 1000)
-                        .put("offset", 0)
-                        .put("sortBy", sortBy);
-
-                request = new Request.Builder()
-                        .url(Config.SUPABASE_URL + "/storage/v1/object/list/" + Config.IMAGES_BUCKET)
-                        .header("apikey", Config.SUPABASE_ANON_KEY)
-                        .header("Authorization", "Bearer " + Config.SUPABASE_ANON_KEY)
-                        .header("Content-Type", "application/json")
-                        .post(RequestBody.create(body.toString(), JSON))
-                        .build();
-            } catch (org.json.JSONException e) {
-                showStatus("Error interno armando la solicitud:\n" + e);
-                scheduleRetryIfEmpty();
-                return;
-            }
-
-            try (Response resp = http.newCall(request).execute()) {
-                String respBody = resp.body() != null ? resp.body().string() : "[]";
-                if (!resp.isSuccessful()) {
-                    showStatus("Error al listar bucket '" + Config.IMAGES_BUCKET + "'\n"
-                            + "HTTP " + resp.code() + "\n"
-                            + truncate(respBody, 500) + "\n\n"
-                            + "URL: " + request.url());
-                    scheduleRetryIfEmpty();
-                    return;
-                }
-                JSONArray arr = new JSONArray(respBody.isEmpty() ? "[]" : respBody);
+                JSONArray root = listBucket("");
                 List<String> urls = new ArrayList<>();
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject item = arr.getJSONObject(i);
+                List<String> folders = new ArrayList<>();
+                for (int i = 0; i < root.length(); i++) {
+                    JSONObject item = root.getJSONObject(i);
                     String name = item.optString("name", "");
-                    // Folders come back with a null id; skip them, we only want files.
-                    if (name.isEmpty() || item.isNull("id") || !isImageFile(name)) continue;
-                    String encodedName = Uri.encode(name);
-                    urls.add(Config.SUPABASE_URL + "/storage/v1/object/public/"
-                            + Config.IMAGES_BUCKET + "/" + encodedName);
+                    if (name.isEmpty()) continue;
+                    if (item.isNull("id")) {
+                        // No id + no metadata means this is a folder placeholder, not a file.
+                        folders.add(name);
+                    } else if (isImageFile(name)) {
+                        urls.add(publicUrl(name));
+                    }
                 }
+
+                if (!folders.isEmpty()) {
+                    showStatus("Bucket '" + Config.IMAGES_BUCKET + "': " + folders.size()
+                            + " subcarpetas encontradas, escaneando…");
+                }
+                for (String folder : folders) {
+                    if (urls.size() >= MAX_IMAGES) break;
+                    try {
+                        JSONArray sub = listBucket(folder + "/");
+                        for (int j = 0; j < sub.length(); j++) {
+                            JSONObject item = sub.getJSONObject(j);
+                            String name = item.optString("name", "");
+                            if (name.isEmpty() || item.isNull("id") || !isImageFile(name)) continue;
+                            urls.add(publicUrl(folder + "/" + name));
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed listing subfolder " + folder, e);
+                    }
+                }
+
                 if (!urls.isEmpty()) {
                     synchronized (imageUrls) {
                         imageUrls.clear();
@@ -192,21 +186,58 @@ public class SlideshowActivity extends Activity {
                     }
                     hideStatus();
                 } else {
-                    showStatus("El bucket '" + Config.IMAGES_BUCKET + "' respondió OK pero no "
-                            + "tiene archivos .jpg/.jpeg/.png/.webp.\n"
-                            + "Respuesta cruda (" + arr.length() + " items):\n"
-                            + truncate(respBody, 500));
+                    showStatus("El bucket '" + Config.IMAGES_BUCKET + "' no tiene archivos "
+                            + ".jpg/.jpeg/.png/.webp, ni en la raíz ni en sus " + folders.size()
+                            + " subcarpetas.");
                     scheduleRetryIfEmpty();
                 }
             } catch (IOException e) {
-                showStatus("Error de red al listar bucket '" + Config.IMAGES_BUCKET + "':\n"
-                        + e + "\n\nURL: " + request.url());
+                showStatus("Error de red al listar bucket '" + Config.IMAGES_BUCKET + "':\n" + e);
                 scheduleRetryIfEmpty();
             } catch (org.json.JSONException e) {
                 showStatus("Respuesta inesperada del bucket '" + Config.IMAGES_BUCKET + "':\n" + e);
                 scheduleRetryIfEmpty();
             }
         });
+    }
+
+    private String publicUrl(String path) {
+        return Config.SUPABASE_URL + "/storage/v1/object/public/" + Config.IMAGES_BUCKET
+                + "/" + Uri.encode(path, "/");
+    }
+
+    /** POST /storage/v1/object/list/{bucket} with the given prefix; throws with a
+     *  detailed message (HTTP status + body + URL) on any non-2xx response. */
+    private JSONArray listBucket(String prefix) throws IOException, org.json.JSONException {
+        JSONObject sortBy;
+        JSONObject body;
+        try {
+            sortBy = new JSONObject().put("column", "name").put("order", "asc");
+            body = new JSONObject()
+                    .put("prefix", prefix)
+                    .put("limit", 1000)
+                    .put("offset", 0)
+                    .put("sortBy", sortBy);
+        } catch (org.json.JSONException e) {
+            throw new IOException("Error interno armando la solicitud", e);
+        }
+
+        Request request = new Request.Builder()
+                .url(Config.SUPABASE_URL + "/storage/v1/object/list/" + Config.IMAGES_BUCKET)
+                .header("apikey", Config.SUPABASE_ANON_KEY)
+                .header("Authorization", "Bearer " + Config.SUPABASE_ANON_KEY)
+                .header("Content-Type", "application/json")
+                .post(RequestBody.create(body.toString(), JSON))
+                .build();
+
+        try (Response resp = http.newCall(request).execute()) {
+            String respBody = resp.body() != null ? resp.body().string() : "[]";
+            if (!resp.isSuccessful()) {
+                throw new IOException("HTTP " + resp.code() + " listando prefix='" + prefix + "'\n"
+                        + truncate(respBody, 500) + "\n\nURL: " + request.url());
+            }
+            return new JSONArray(respBody.isEmpty() ? "[]" : respBody);
+        }
     }
 
     private void scheduleRetryIfEmpty() {
