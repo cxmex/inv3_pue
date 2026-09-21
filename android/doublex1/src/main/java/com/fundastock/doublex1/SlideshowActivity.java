@@ -75,17 +75,27 @@ public class SlideshowActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (relocateToSecondaryDisplayIfNeeded()) {
-            finish();
-            return;
-        }
 
+        // UI must exist before anything risky runs, so a failure below has
+        // somewhere to show itself instead of crashing to a blank screen.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_slideshow);
         imageView = findViewById(R.id.image_slideshow);
         statusScroll = findViewById(R.id.status_scroll);
         statusText = findViewById(R.id.text_status);
         hideSystemBars();
+
+        try {
+            if (relocateToSecondaryDisplayIfNeeded()) {
+                finish();
+                return;
+            }
+        } catch (Exception e) {
+            // Non-privileged apps can be denied cross-display launches on
+            // some Android security configs. Fall back to running right
+            // here instead of crashing — at least something shows up.
+            showStatus("No se pudo mover a la pantalla secundaria, sigue aquí:\n" + e);
+        }
 
         loadPhotoNames();
         mainHandler.postDelayed(rotateRunnable, ROTATE_INTERVAL_MS);
