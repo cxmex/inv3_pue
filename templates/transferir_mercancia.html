@@ -6,6 +6,7 @@
     <title>Transferir Mercancia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { background: #f5f5f5; font-size: 15px; }
@@ -112,6 +113,7 @@
         <div class="camera-overlay" id="camera-overlay">
             <button class="cam-close" onclick="stopCamera()"><i class="bi bi-x-lg"></i></button>
             <video id="cam-video" autoplay playsinline muted></video>
+            <canvas id="cam-canvas" style="display:none;"></canvas>
             <div class="scan-line"></div>
             <div class="cam-status" id="cam-status">Apunta al codigo de barras...</div>
         </div>
@@ -373,7 +375,7 @@
         }
 
         // Camera scanner
-        let camStream = null, scanInterval = null;
+        let camStream = null, scanInterval = null, zxingReader = null;
         async function startCamera() {
             const overlay = document.getElementById('camera-overlay');
             const video = document.getElementById('cam-video');
@@ -386,29 +388,65 @@
                 });
                 video.srcObject = camStream;
                 await video.play();
-                camStatus.textContent = 'Apunta al codigo de barras...';
-                if ('BarcodeDetector' in window) {
-                    const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code'] });
-                    scanInterval = setInterval(async () => {
-                        try {
-                            const barcodes = await detector.detect(video);
-                            if (barcodes.length > 0) {
-                                camStatus.textContent = 'Encontrado: ' + barcodes[0].rawValue;
-                                stopCamera();
-                                lookupProduct(barcodes[0].rawValue);
-                            }
-                        } catch (e) {}
-                    }, 300);
-                } else {
-                    camStatus.textContent = 'BarcodeDetector no disponible. Usa el campo de texto.';
-                }
             } catch (err) {
                 camStatus.textContent = 'Error: ' + err.message;
                 setTimeout(() => stopCamera(), 2000);
+                return;
+            }
+
+            function onDetected(code) {
+                camStatus.textContent = 'Encontrado: ' + code;
+                stopCamera();
+                lookupProduct(code);
+            }
+
+            // Native BarcodeDetector — Chrome/Android
+            if ('BarcodeDetector' in window) {
+                camStatus.textContent = 'Apunta al codigo de barras...';
+                const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code'] });
+                scanInterval = setInterval(async () => {
+                    try {
+                        const barcodes = await detector.detect(video);
+                        if (barcodes.length > 0) onDetected(barcodes[0].rawValue);
+                    } catch (e) {}
+                }, 300);
+
+            // ZXing fallback — Safari/iOS (no BarcodeDetector support)
+            } else if (typeof ZXing !== 'undefined') {
+                camStatus.textContent = 'Apunta al codigo de barras...';
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+                    ZXing.BarcodeFormat.UPC_A,  ZXing.BarcodeFormat.UPC_E,
+                    ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39
+                ]);
+                hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                zxingReader = new ZXing.MultiFormatReader();
+                zxingReader.setHints(hints);
+
+                const canvas = document.getElementById('cam-canvas');
+                const ctx = canvas.getContext('2d');
+                scanInterval = setInterval(() => {
+                    if (video.readyState < 2) return;
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    try {
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const lum = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
+                        const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+                        const result = zxingReader.decode(bmp);
+                        if (result && result.getText()) onDetected(result.getText());
+                    } catch (e) { /* NotFoundException es normal mientras busca */ }
+                }, 200);
+
+            } else {
+                camStatus.textContent = 'Escaneo no disponible en este navegador. Usa el campo de texto.';
             }
         }
         function stopCamera() {
             if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+            zxingReader = null;
             if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
             document.getElementById('camera-overlay').classList.remove('show');
             barcodeInput.focus();

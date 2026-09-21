@@ -2003,7 +2003,7 @@ async def list_conteo_cajas2():
 @app.get("/api/conteo-previo/reconcile")
 async def reconcile_caja3(caja_numero: int, fecha_from: str, fecha_to: str):
     try:
-        counted, entradas1, entradas2 = await asyncio.gather(
+        counted, entradas1, entradas3 = await asyncio.gather(
             supabase_request(
                 method="GET", endpoint="/rest/v1/conteo_previo",
                 params={"caja_numero": f"eq.{caja_numero}", "select": "modelo,color,qty", "order": "modelo.asc"}
@@ -2020,17 +2020,17 @@ async def reconcile_caja3(caja_numero: int, fecha_from: str, fecha_to: str):
         )
         if isinstance(counted, Exception): counted = []
         if isinstance(entradas1, Exception): entradas1 = []
-        if isinstance(entradas2, Exception): entradas2 = []
+        if isinstance(entradas3, Exception): entradas3 = []
         total_counted  = sum(r["qty"] for r in counted)
         total_entered1 = sum(r["qty"] for r in entradas1)
-        total_entered2 = sum(r["qty"] for r in entradas2)
-        total_entered  = total_entered1 + total_entered2
+        total_entered3 = sum(r["qty"] for r in entradas3)
+        total_entered  = total_entered1 + total_entered3
         return {
             "caja_numero": caja_numero, "fecha_from": fecha_from, "fecha_to": fecha_to,
             "total_counted": total_counted, "total_entered": total_entered,
-            "total_entered1": total_entered1, "total_entered2": total_entered2,
+            "total_entered1": total_entered1, "total_entered3": total_entered3,
             "diff": total_entered - total_counted,
-            "counted": counted, "entradas1": entradas1, "entradas2": entradas2,
+            "counted": counted, "entradas1": entradas1, "entradas3": entradas3,
         }
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
