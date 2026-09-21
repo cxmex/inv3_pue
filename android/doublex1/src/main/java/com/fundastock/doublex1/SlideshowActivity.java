@@ -1,11 +1,15 @@
 package com.fundastock.doublex1;
 
 import android.app.Activity;
+import android.app.ActivityOptions;
+import android.content.Intent;
 import android.graphics.drawable.Drawable;
+import android.hardware.display.DisplayManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.Display;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
@@ -37,6 +41,11 @@ import java.util.Random;
  * simpler and immune to bucket/network failures on unattended store
  * hardware. To refresh the photo set: drop new files in
  * android/doublex1/src/main/assets/photos/ and rebuild.
+ *
+ * This must never occupy the main POS screen — terex3 runs there. On
+ * launch it checks which physical display it landed on; if that's not a
+ * secondary/presentation display, it relaunches itself onto one and closes
+ * this instance, so it self-corrects no matter how it was opened.
  */
 public class SlideshowActivity extends Activity {
 
@@ -66,6 +75,11 @@ public class SlideshowActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (relocateToSecondaryDisplayIfNeeded()) {
+            finish();
+            return;
+        }
+
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_slideshow);
         imageView = findViewById(R.id.image_slideshow);
@@ -76,6 +90,36 @@ public class SlideshowActivity extends Activity {
         loadPhotoNames();
         mainHandler.postDelayed(rotateRunnable, ROTATE_INTERVAL_MS);
         showRandomImage();
+    }
+
+    /**
+     * If a secondary/presentation display exists and this activity is not
+     * already running on it, relaunches itself there via setLaunchDisplayId()
+     * (same mechanism as Rockchip's dual-display guide) and returns true so
+     * the caller can finish() this instance. Returns false if there's only
+     * one display (e.g. testing on a single-screen device) or we're already
+     * on the right one — nothing to do.
+     */
+    private boolean relocateToSecondaryDisplayIfNeeded() {
+        DisplayManager dm = (DisplayManager) getSystemService(DISPLAY_SERVICE);
+        if (dm == null) return false;
+        Display[] presentationDisplays = dm.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION);
+        if (presentationDisplays == null || presentationDisplays.length == 0) {
+            return false;
+        }
+        int targetDisplayId = presentationDisplays[presentationDisplays.length - 1].getDisplayId();
+        int currentDisplayId = getWindowManager().getDefaultDisplay().getDisplayId();
+        if (currentDisplayId == targetDisplayId) {
+            return false;
+        }
+
+        Log.i(TAG, "Relocating from display " + currentDisplayId + " to " + targetDisplayId);
+        ActivityOptions options = ActivityOptions.makeBasic();
+        options.setLaunchDisplayId(targetDisplayId);
+        Intent intent = new Intent(this, SlideshowActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(intent, options.toBundle());
+        return true;
     }
 
     @Override
