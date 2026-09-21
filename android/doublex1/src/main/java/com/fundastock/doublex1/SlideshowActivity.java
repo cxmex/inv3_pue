@@ -2,7 +2,6 @@ package com.fundastock.doublex1;
 
 import android.app.Activity;
 import android.graphics.drawable.Drawable;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -20,9 +19,6 @@ import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -30,44 +26,28 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 
 /**
- * Unattended marketing display: pulls the images-colores bucket from Supabase
- * and cycles a random one every 2s full-screen. Meant to run on a secondary
- * display next to the terex3 POS app (see Rockchip's dual-display guide —
- * each app targets its own screen independently, no inter-app wiring).
+ * Unattended marketing display: cycles a random photo from assets/photos/
+ * every 2s full-screen. Meant to run on a secondary display next to the
+ * terex3 POS app (see Rockchip's dual-display guide — each app targets its
+ * own screen independently, no inter-app wiring).
  *
- * This runs unattended on store hardware nobody is logged into, so on any
- * failure it shows the error full-screen instead of going blank — that way
- * someone can just photograph the screen and send it back for debugging.
+ * Photos are bundled into the APK (not fetched from Supabase Storage) —
+ * simpler and immune to bucket/network failures on unattended store
+ * hardware. To refresh the photo set: drop new files in
+ * android/doublex1/src/main/assets/photos/ and rebuild.
  */
 public class SlideshowActivity extends Activity {
 
     private static final String TAG = "SlideshowActivity";
+    private static final String PHOTOS_DIR = "photos";
     private static final long ROTATE_INTERVAL_MS = 2000;
-    private static final long LIST_REFRESH_INTERVAL_MS = TimeUnit.MINUTES.toMillis(5);
-    private static final long LIST_RETRY_INTERVAL_MS = TimeUnit.SECONDS.toMillis(15);
-    private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final SimpleDateFormat TIME_FMT =
             new SimpleDateFormat("HH:mm:ss", Locale.US);
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private final OkHttpClient http = new OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .build();
-
-    private final List<String> imageUrls = new ArrayList<>();
+    private final List<String> photoNames = new ArrayList<>();
     private final Random random = new Random();
     private int lastIndex = -1;
 
@@ -83,14 +63,6 @@ public class SlideshowActivity extends Activity {
         }
     };
 
-    private final Runnable refreshListRunnable = new Runnable() {
-        @Override
-        public void run() {
-            fetchImageList();
-            mainHandler.postDelayed(this, LIST_REFRESH_INTERVAL_MS);
-        }
-    };
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -101,10 +73,9 @@ public class SlideshowActivity extends Activity {
         statusText = findViewById(R.id.text_status);
         hideSystemBars();
 
-        showStatus("Iniciando…\nBucket: " + Config.IMAGES_BUCKET);
-        fetchImageList();
-        mainHandler.postDelayed(refreshListRunnable, LIST_REFRESH_INTERVAL_MS);
+        loadPhotoNames();
         mainHandler.postDelayed(rotateRunnable, ROTATE_INTERVAL_MS);
+        showRandomImage();
     }
 
     @Override
@@ -138,113 +109,21 @@ public class SlideshowActivity extends Activity {
         mainHandler.post(() -> statusScroll.setVisibility(View.GONE));
     }
 
-    /** Cap on how many image URLs we collect, so a bucket with hundreds of
-     *  subfolders doesn't make the periodic refresh unreasonably slow. */
-    private static final int MAX_IMAGES = 400;
-
-    private void fetchImageList() {
-        executor.execute(() -> {
-            try {
-                JSONArray root = listBucket("");
-                List<String> urls = new ArrayList<>();
-                List<String> folders = new ArrayList<>();
-                for (int i = 0; i < root.length(); i++) {
-                    JSONObject item = root.getJSONObject(i);
-                    String name = item.optString("name", "");
-                    if (name.isEmpty()) continue;
-                    if (item.isNull("id")) {
-                        // No id + no metadata means this is a folder placeholder, not a file.
-                        folders.add(name);
-                    } else if (isImageFile(name)) {
-                        urls.add(publicUrl(name));
-                    }
-                }
-
-                if (!folders.isEmpty()) {
-                    showStatus("Bucket '" + Config.IMAGES_BUCKET + "': " + folders.size()
-                            + " subcarpetas encontradas, escaneando…");
-                }
-                for (String folder : folders) {
-                    if (urls.size() >= MAX_IMAGES) break;
-                    try {
-                        JSONArray sub = listBucket(folder + "/");
-                        for (int j = 0; j < sub.length(); j++) {
-                            JSONObject item = sub.getJSONObject(j);
-                            String name = item.optString("name", "");
-                            if (name.isEmpty() || item.isNull("id") || !isImageFile(name)) continue;
-                            urls.add(publicUrl(folder + "/" + name));
-                        }
-                    } catch (Exception e) {
-                        Log.w(TAG, "Failed listing subfolder " + folder, e);
-                    }
-                }
-
-                if (!urls.isEmpty()) {
-                    synchronized (imageUrls) {
-                        imageUrls.clear();
-                        imageUrls.addAll(urls);
-                    }
-                    hideStatus();
-                } else {
-                    showStatus("El bucket '" + Config.IMAGES_BUCKET + "' no tiene archivos "
-                            + ".jpg/.jpeg/.png/.webp, ni en la raíz ni en sus " + folders.size()
-                            + " subcarpetas.");
-                    scheduleRetryIfEmpty();
-                }
-            } catch (IOException e) {
-                showStatus("Error de red al listar bucket '" + Config.IMAGES_BUCKET + "':\n" + e);
-                scheduleRetryIfEmpty();
-            } catch (org.json.JSONException e) {
-                showStatus("Respuesta inesperada del bucket '" + Config.IMAGES_BUCKET + "':\n" + e);
-                scheduleRetryIfEmpty();
-            }
-        });
-    }
-
-    private String publicUrl(String path) {
-        return Config.SUPABASE_URL + "/storage/v1/object/public/" + Config.IMAGES_BUCKET
-                + "/" + Uri.encode(path, "/");
-    }
-
-    /** POST /storage/v1/object/list/{bucket} with the given prefix; throws with a
-     *  detailed message (HTTP status + body + URL) on any non-2xx response. */
-    private JSONArray listBucket(String prefix) throws IOException, org.json.JSONException {
-        JSONObject sortBy;
-        JSONObject body;
+    private void loadPhotoNames() {
         try {
-            sortBy = new JSONObject().put("column", "name").put("order", "asc");
-            body = new JSONObject()
-                    .put("prefix", prefix)
-                    .put("limit", 1000)
-                    .put("offset", 0)
-                    .put("sortBy", sortBy);
-        } catch (org.json.JSONException e) {
-            throw new IOException("Error interno armando la solicitud", e);
-        }
-
-        Request request = new Request.Builder()
-                .url(Config.SUPABASE_URL + "/storage/v1/object/list/" + Config.IMAGES_BUCKET)
-                .header("apikey", Config.SUPABASE_ANON_KEY)
-                .header("Authorization", "Bearer " + Config.SUPABASE_ANON_KEY)
-                .header("Content-Type", "application/json")
-                .post(RequestBody.create(body.toString(), JSON))
-                .build();
-
-        try (Response resp = http.newCall(request).execute()) {
-            String respBody = resp.body() != null ? resp.body().string() : "[]";
-            if (!resp.isSuccessful()) {
-                throw new IOException("HTTP " + resp.code() + " listando prefix='" + prefix + "'\n"
-                        + truncate(respBody, 500) + "\n\nURL: " + request.url());
+            String[] names = getAssets().list(PHOTOS_DIR);
+            photoNames.clear();
+            if (names != null) {
+                for (String name : names) {
+                    if (isImageFile(name)) photoNames.add(name);
+                }
             }
-            return new JSONArray(respBody.isEmpty() ? "[]" : respBody);
+            if (photoNames.isEmpty()) {
+                showStatus("No hay fotos empaquetadas en assets/" + PHOTOS_DIR + "/");
+            }
+        } catch (IOException e) {
+            showStatus("Error leyendo assets/" + PHOTOS_DIR + "/:\n" + e);
         }
-    }
-
-    private void scheduleRetryIfEmpty() {
-        synchronized (imageUrls) {
-            if (!imageUrls.isEmpty()) return;
-        }
-        mainHandler.postDelayed(this::fetchImageList, LIST_RETRY_INTERVAL_MS);
     }
 
     private boolean isImageFile(String name) {
@@ -253,34 +132,27 @@ public class SlideshowActivity extends Activity {
                 || lower.endsWith(".png") || lower.endsWith(".webp");
     }
 
-    private static String truncate(String s, int max) {
-        if (s == null) return "";
-        return s.length() > max ? s.substring(0, max) + "…" : s;
-    }
-
     private void showRandomImage() {
-        String url;
-        synchronized (imageUrls) {
-            if (imageUrls.isEmpty()) return;
-            int index = 0;
-            if (imageUrls.size() > 1) {
-                do {
-                    index = random.nextInt(imageUrls.size());
-                } while (index == lastIndex);
-            }
-            lastIndex = index;
-            url = imageUrls.get(index);
+        if (photoNames.isEmpty()) return;
+        int index = 0;
+        if (photoNames.size() > 1) {
+            do {
+                index = random.nextInt(photoNames.size());
+            } while (index == lastIndex);
         }
-        final String loadedUrl = url;
+        lastIndex = index;
+        String name = photoNames.get(index);
+        String assetPath = "file:///android_asset/" + PHOTOS_DIR + "/" + name;
+
         Glide.with(this)
-                .load(url)
-                .diskCacheStrategy(DiskCacheStrategy.DATA)
+                .load(assetPath)
+                .diskCacheStrategy(DiskCacheStrategy.NONE)
                 .transition(DrawableTransitionOptions.withCrossFade(400))
                 .listener(new RequestListener<Drawable>() {
                     @Override
                     public boolean onLoadFailed(GlideException e, Object model, Target<Drawable> target,
                                                  boolean isFirstResource) {
-                        showStatus("No se pudo cargar la imagen:\n" + loadedUrl + "\n\n"
+                        showStatus("No se pudo cargar la imagen empaquetada:\n" + name + "\n\n"
                                 + (e != null ? e.toString() : "error desconocido"));
                         return false;
                     }
@@ -299,6 +171,5 @@ public class SlideshowActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         mainHandler.removeCallbacksAndMessages(null);
-        executor.shutdownNow();
     }
 }
